@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Zenith Maker Ultimate</title>
+    <style>
+        /* CSS Dasar */
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: #f0f2f5; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 10px;
+            overscroll-behavior-y: contain; 
+        }
+
+        .container {
+            width: 100%;
+            max-width: 450px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* AREA SCROLL (Jendela Tampilan) */
+        .scroll-window {
+            width: 100%;
+            height: 55vh; /* Tinggi area kerja */
+            border: 2px solid #8e44ad;
+            border-radius: 8px;
+            background: #ccc;
+            overflow: auto; 
+            position: relative;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+            background-image: 
+              linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee),
+              linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            background-color: #fff;
+        }
+
+        canvas {
+            display: block;
+            width: 100%; 
+            height: auto;
+            transform-origin: top left;
+        }
+
+        /* Panel Kontrol */
+        .controls {
+            background: white;
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+        }
+
+        /* Toolbar Tombol */
+        .toolbar {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            padding: 5px;
+            border-radius: 8px;
+            flex-wrap: wrap; /* Biar rapi kalau layar kecil */
+        }
+
+        .tool-btn {
+            flex: 1;
+            min-width: 60px;
+            padding: 8px 4px;
+            border: 1px solid transparent;
+            background: transparent;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: bold;
+            color: #666;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .tool-btn.active {
+            background: #fff;
+            border-color: #ddd;
+            color: #8e44ad;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .icon { font-size: 18px; display: block; }
+
+        .btn-upload {
+            width: 100%;
+            padding: 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .btn-save {
+            width: 100%;
+            padding: 15px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            margin-top: 15px;
+            font-size: 16px;
+        }
+
+        /* Slider Styles */
+        .slider-group {
+            margin-bottom: 8px;
+            background: #fcfcfc;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+        
+        /* Warna khusus untuk slider kuas */
+        .brush-controls {
+            background: #fff0f0; 
+            border-color: #ffcccc;
+            display: none; /* Sembunyi kalau bukan mode kuas/hapus */
+        }
+
+        .slider-label {
+            font-size: 11px;
+            font-weight: bold;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+        }
+        input[type="range"] { width: 100%; margin-top: 5px; height: 25px; }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h3 style="text-align:center; margin: 0; color:#8e44ad; font-size: 18px;">Zenith Ultimate</h3>
+
+        <div class="scroll-window" id="scrollContainer">
+            <canvas id="displayCanvas"></canvas>
+        </div>
+
+        <div class="controls">
+            <button class="btn-upload" onclick="document.getElementById('fileInput').click()">📂 1. Upload Screenshot</button>
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+
+            <div class="slider-label" style="margin-bottom: 5px;">Pilih Alat:</div>
+            <div class="toolbar">
+                <button class="tool-btn active" id="btnMove" onclick="setMode('move')">
+                    <span class="icon">✋</span> Geser FOTO
+                </button>
+                <button class="tool-btn" id="btnScroll" onclick="setMode('scroll')">
+                    <span class="icon">↔️</span> Geser LAYAR
+                </button>
+                <button class="tool-btn" id="btnBrush" onclick="setMode('brush')">
+                    <span class="icon">🖌️</span> SENSOR
+                </button>
+                <button class="tool-btn" id="btnEraser" onclick="setMode('eraser')">
+                    <span class="icon">🧼</span> HAPUS
+                </button>
+            </div>
+
+            <div class="slider-group brush-controls" id="brushSettingPanel">
+                <div class="slider-label">
+                    <span>Ukuran Kuas / Penghapus</span>
+                    <span id="brushSizeVal">30px</span>
+                </div>
+                <input type="range" id="brushSizeSlider" min="10" max="100" step="5" value="30">
+            </div>
+
+            <div class="slider-group" style="border-color: #8e44ad; background: #f3e5f5;">
+                <div class="slider-label">
+                    <span>🔍 Zoom Tampilan (Biar Gede)</span>
+                    <span id="viewZoomVal">100%</span>
+                </div>
+                <input type="range" id="viewZoomSlider" min="100" max="400" step="10" value="100">
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-label">Ukuran Foto (Kecil/Besar)</div>
+                <input type="range" id="photoZoomSlider" min="0.1" max="2.0" step="0.01" value="1.0">
+            </div>
+
+            <button class="btn-save" onclick="saveImage()">💾 Simpan Galeri</button>
+        </div>
+    </div>
+
+    <script>
+        // --- SETUP ---
+        const canvas = document.getElementById('displayCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Dua Kanvas Bayangan
+        const helperCanvas = document.createElement('canvas'); // Kanvas Edit (Kotor)
+        const helperCtx = helperCanvas.getContext('2d');
+        
+        // Simpan gambar asli (Clean) untuk fitur penghapus
+        let rawImgObject = null; 
+
+        const frameUrl = "template.png"; 
+        let frameImg = new Image();
+        let currentMode = 'move'; 
+
+        // State Gambar
+        let imgX = 0, imgY = 0;
+        let imgScale = 1.0;
+        let isImageReady = false;
+        
+        // State Kuas
+        let userBrushSize = 30;
+
+        // Touch Vars
+        let isTouching = false;
+        let startX, startY;
+
+        // --- INIT ---
+        frameImg.src = frameUrl;
+        frameImg.onload = () => {
+            canvas.width = frameImg.width;
+            canvas.height = frameImg.height;
+            renderAll();
+        };
+
+        // --- FUNGSI UTAMA ---
+
+        // 1. Upload
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            if (!e.target.files[0]) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    rawImgObject = img; // Simpan versi bersih
+
+                    // Setup Kanvas Bayangan
+                    helperCanvas.width = img.width;
+                    helperCanvas.height = img.height;
+                    helperCtx.drawImage(img, 0, 0); // Gambar awal
+                    
+                    isImageReady = true;
+
+                    // Auto Fit Logic
+                    const scaleW = canvas.width / img.width;
+                    const scaleH = canvas.height / img.height;
+                    imgScale = Math.min(scaleW, scaleH) * 0.9;
+                    
+                    document.getElementById('photoZoomSlider').value = imgScale;
+                    
+                    // Center
+                    imgX = (canvas.width - (img.width * imgScale)) / 2;
+                    imgY = (canvas.height - (img.height * imgScale)) / 2;
+
+                    setMode('move');
+                    renderAll();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        });
+
+        // 2. Ganti Mode & UI Slider Kuas
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Update Tombol Aktif
+            ['move', 'scroll', 'brush', 'eraser'].forEach(m => {
+                const btn = document.getElementById('btn' + m.charAt(0).toUpperCase() + m.slice(1));
+                if (m === mode) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+
+            // Tampilkan/Sembunyikan Slider Kuas
+            const brushPanel = document.getElementById('brushSettingPanel');
+            if (mode === 'brush' || mode === 'eraser') {
+                brushPanel.style.display = 'block';
+            } else {
+                brushPanel.style.display = 'none';
+            }
+
+            // Logic Scroll vs Lock
+            if (mode === 'scroll') {
+                canvas.style.touchAction = 'auto';
+                canvas.style.cursor = 'grab';
+            } else {
+                canvas.style.touchAction = 'none'; 
+                canvas.style.cursor = (mode === 'brush' || mode === 'eraser') ? 'crosshair' : 'move';
+            }
+        }
+
+        // 3. Slider Ukuran Kuas
+        document.getElementById('brushSizeSlider').addEventListener('input', (e) => {
+            userBrushSize = parseInt(e.target.value);
+            document.getElementById('brushSizeVal').textContent = userBrushSize + "px";
+        });
+
+        // 4. Zoom Tampilan (CSS)
+        document.getElementById('viewZoomSlider').addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('viewZoomVal').textContent = val + "%";
+            canvas.style.width = val + "%"; 
+        });
+
+        // 5. Zoom Foto (Canvas)
+        document.getElementById('photoZoomSlider').addEventListener('input', (e) => {
+            if(!isImageReady) return;
+            const newScale = parseFloat(e.target.value);
+            const oldW = helperCanvas.width * imgScale;
+            const newW = helperCanvas.width * newScale;
+            const oldH = helperCanvas.height * imgScale;
+            const newH = helperCanvas.height * newScale;
+            imgX -= (newW - oldW) / 2;
+            imgY -= (newH - oldH) / 2;
+            imgScale = newScale;
+            renderAll();
+        });
+
+        // 6. Render
+        function renderAll() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (isImageReady) {
+                ctx.drawImage(helperCanvas, imgX, imgY, helperCanvas.width * imgScale, helperCanvas.height * imgScale);
+            }
+            ctx.drawImage(frameImg, 0, 0);
+        }
+
+        // --- TOUCH EVENTS ---
+
+        function getTouchPos(e) {
+            const rect = canvas.getBoundingClientRect(); 
+            const touch = e.touches[0] || e.changedTouches[0];
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            return {
+                x: (touch.clientX - rect.left) * scaleX,
+                y: (touch.clientY - rect.top) * scaleY,
+                rawX: touch.clientX, 
+                rawY: touch.clientY
+            };
+        }
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (currentMode === 'scroll') return;
+            e.preventDefault(); 
+            if (!isImageReady) return;
+            
+            isTouching = true;
+            const pos = getTouchPos(e);
+            startX = pos.rawX;
+            startY = pos.rawY;
+
+            if (currentMode === 'brush' || currentMode === 'eraser') applyTool(pos.x, pos.y);
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (currentMode === 'scroll') return;
+            e.preventDefault(); 
+            if (!isTouching || !isImageReady) return;
+
+            const pos = getTouchPos(e);
+
+            if (currentMode === 'move') {
+                const rect = canvas.getBoundingClientRect();
+                const cssScale = canvas.width / rect.width;
+                const dx = (pos.rawX - startX) * cssScale;
+                const dy = (pos.rawY - startY) * cssScale;
+                imgX += dx;
+                imgY += dy;
+                startX = pos.rawX;
+                startY = pos.rawY;
+                renderAll();
+            } 
+            else if (currentMode === 'brush' || currentMode === 'eraser') {
+                applyTool(pos.x, pos.y);
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', () => { isTouching = false; });
+
+        // --- LOGIKA KUAS & PENGHAPUS ---
+        function applyTool(x, y) {
+            // Konversi koordinat layar ke koordinat asli gambar
+            const relX = (x - imgX) / imgScale;
+            const relY = (y - imgY) / imgScale;
+            
+            // Hitung ukuran kuas relatif terhadap gambar (agar konsisten saat di-zoom)
+            // Rumus: ukuran_user / skala_foto
+            const brushSize = userBrushSize / imgScale; 
+            const halfBrush = brushSize / 2;
+
+            if (currentMode === 'brush') {
+                // --- LOGIKA SENSOR (PIXELATE) ---
+                const pixelSize = 10; 
+                for (let bx = relX - halfBrush; bx < relX + halfBrush; bx += pixelSize) {
+                    for (let by = relY - halfBrush; by < relY + halfBrush; by += pixelSize) {
+                        if (bx < 0 || by < 0 || bx >= helperCanvas.width || by >= helperCanvas.height) continue;
+                        
+                        // Ambil warna pixel
+                        const p = helperCtx.getImageData(bx, by, 1, 1).data;
+                        // Timpa dengan kotak solid (efek mozaik)
+                        helperCtx.fillStyle = `rgb(${p[0]}, ${p[1]}, ${p[2]})`;
+                        helperCtx.fillRect(bx, by, pixelSize, pixelSize);
+                    }
+                }
+            } 
+            else if (currentMode === 'eraser') {
+                // --- LOGIKA PENGHAPUS (RESTORE) ---
+                // Kita "menjiplak" kembali dari rawImgObject (gambar bersih) ke helperCanvas
+                if(rawImgObject) {
+                    // drawImage punya fitur clipping (crop)
+                    // Syntax: image, sourceX, sourceY, sourceW, sourceH, destX, destY, destW, destH
+                    helperCtx.drawImage(
+                        rawImgObject, 
+                        relX - halfBrush, relY - halfBrush, brushSize, brushSize, // Ambil kotak dari gambar asli
+                        relX - halfBrush, relY - halfBrush, brushSize, brushSize  // Tempel ke kanvas edit
+                    );
+                }
+            }
+
+            renderAll();
+        }
+
+        function saveImage() {
+            const link = document.createElement('a');
+            link.download = 'Testi-Zenith.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+    </script>
+</body>
+</html>
