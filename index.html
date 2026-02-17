@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Zenith Maker Ultimate</title>
+    <title>Zenith Maker Ultimate + Notif</title>
     <style>
         /* CSS Dasar */
         body { 
@@ -24,10 +24,10 @@
             gap: 10px;
         }
 
-        /* AREA SCROLL (Jendela Tampilan) */
+        /* AREA SCROLL */
         .scroll-window {
             width: 100%;
-            height: 55vh; /* Tinggi area kerja */
+            height: 55vh; 
             border: 2px solid #8e44ad;
             border-radius: 8px;
             background: #ccc;
@@ -57,7 +57,7 @@
             box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
         }
 
-        /* Toolbar Tombol */
+        /* Toolbar */
         .toolbar {
             display: flex;
             gap: 5px;
@@ -65,7 +65,7 @@
             background: #f8f9fa;
             padding: 5px;
             border-radius: 8px;
-            flex-wrap: wrap; /* Biar rapi kalau layar kecil */
+            flex-wrap: wrap; 
         }
 
         .tool-btn {
@@ -116,6 +116,7 @@
             font-weight: bold;
             margin-top: 15px;
             font-size: 16px;
+            cursor: pointer;
         }
 
         /* Slider Styles */
@@ -127,11 +128,10 @@
             border: 1px solid #eee;
         }
         
-        /* Warna khusus untuk slider kuas */
         .brush-controls {
             background: #fff0f0; 
             border-color: #ffcccc;
-            display: none; /* Sembunyi kalau bukan mode kuas/hapus */
+            display: none; 
         }
 
         .slider-label {
@@ -142,6 +142,32 @@
             justify-content: space-between;
         }
         input[type="range"] { width: 100%; margin-top: 5px; height: 25px; }
+
+        /* --- CSS UNTUK NOTIFIKASI (TOAST) --- */
+        #toast {
+            visibility: hidden; /* Sembunyi dulu */
+            min-width: 250px;
+            margin-left: -125px; /* Center */
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 50px; /* Bulat lonjong */
+            padding: 16px;
+            position: fixed;
+            z-index: 999; /* Paling depan */
+            left: 50%;
+            bottom: 30px; /* Jarak dari bawah */
+            font-size: 14px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            opacity: 0;
+            transition: opacity 0.5s, bottom 0.5s;
+        }
+
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+            bottom: 50px; /* Efek naik sedikit */
+        }
 
     </style>
 </head>
@@ -176,7 +202,7 @@
 
             <div class="slider-group brush-controls" id="brushSettingPanel">
                 <div class="slider-label">
-                    <span>Ukuran Kuas / Penghapus</span>
+                    <span>Ukuran Kuas</span>
                     <span id="brushSizeVal">30px</span>
                 </div>
                 <input type="range" id="brushSizeSlider" min="10" max="100" step="5" value="30">
@@ -184,14 +210,14 @@
 
             <div class="slider-group" style="border-color: #8e44ad; background: #f3e5f5;">
                 <div class="slider-label">
-                    <span>🔍 Zoom Tampilan (Biar Gede)</span>
+                    <span>🔍 Zoom Tampilan</span>
                     <span id="viewZoomVal">100%</span>
                 </div>
                 <input type="range" id="viewZoomSlider" min="100" max="400" step="10" value="100">
             </div>
 
             <div class="slider-group">
-                <div class="slider-label">Ukuran Foto (Kecil/Besar)</div>
+                <div class="slider-label">Ukuran Foto</div>
                 <input type="range" id="photoZoomSlider" min="0.1" max="2.0" step="0.01" value="1.0">
             </div>
 
@@ -199,35 +225,29 @@
         </div>
     </div>
 
+    <div id="toast">✅ Berhasil Disimpan!<br>Cek Galeri / Download HP Kamu.</div>
+
     <script>
-        // --- SETUP ---
         const canvas = document.getElementById('displayCanvas');
         const ctx = canvas.getContext('2d');
-        
-        // Dua Kanvas Bayangan
-        const helperCanvas = document.createElement('canvas'); // Kanvas Edit (Kotor)
+        const helperCanvas = document.createElement('canvas'); 
         const helperCtx = helperCanvas.getContext('2d');
         
-        // Simpan gambar asli (Clean) untuk fitur penghapus
         let rawImgObject = null; 
 
+        // Ganti path sesuai struktur folder kamu (template.png jika sejajar)
         const frameUrl = "template.png"; 
+        
         let frameImg = new Image();
         let currentMode = 'move'; 
 
-        // State Gambar
         let imgX = 0, imgY = 0;
         let imgScale = 1.0;
         let isImageReady = false;
-        
-        // State Kuas
         let userBrushSize = 30;
-
-        // Touch Vars
         let isTouching = false;
         let startX, startY;
 
-        // --- INIT ---
         frameImg.src = frameUrl;
         frameImg.onload = () => {
             canvas.width = frameImg.width;
@@ -237,30 +257,26 @@
 
         // --- FUNGSI UTAMA ---
 
-        // 1. Upload
         document.getElementById('fileInput').addEventListener('change', (e) => {
             if (!e.target.files[0]) return;
             const reader = new FileReader();
             reader.onload = (event) => {
                 const img = new Image();
                 img.onload = () => {
-                    rawImgObject = img; // Simpan versi bersih
-
-                    // Setup Kanvas Bayangan
+                    rawImgObject = img; 
                     helperCanvas.width = img.width;
                     helperCanvas.height = img.height;
-                    helperCtx.drawImage(img, 0, 0); // Gambar awal
+                    helperCtx.drawImage(img, 0, 0);
                     
                     isImageReady = true;
 
-                    // Auto Fit Logic
+                    // Auto Fit
                     const scaleW = canvas.width / img.width;
                     const scaleH = canvas.height / img.height;
                     imgScale = Math.min(scaleW, scaleH) * 0.9;
                     
                     document.getElementById('photoZoomSlider').value = imgScale;
                     
-                    // Center
                     imgX = (canvas.width - (img.width * imgScale)) / 2;
                     imgY = (canvas.height - (img.height * imgScale)) / 2;
 
@@ -272,26 +288,17 @@
             reader.readAsDataURL(e.target.files[0]);
         });
 
-        // 2. Ganti Mode & UI Slider Kuas
         function setMode(mode) {
             currentMode = mode;
-            
-            // Update Tombol Aktif
             ['move', 'scroll', 'brush', 'eraser'].forEach(m => {
                 const btn = document.getElementById('btn' + m.charAt(0).toUpperCase() + m.slice(1));
                 if (m === mode) btn.classList.add('active');
                 else btn.classList.remove('active');
             });
 
-            // Tampilkan/Sembunyikan Slider Kuas
             const brushPanel = document.getElementById('brushSettingPanel');
-            if (mode === 'brush' || mode === 'eraser') {
-                brushPanel.style.display = 'block';
-            } else {
-                brushPanel.style.display = 'none';
-            }
+            brushPanel.style.display = (mode === 'brush' || mode === 'eraser') ? 'block' : 'none';
 
-            // Logic Scroll vs Lock
             if (mode === 'scroll') {
                 canvas.style.touchAction = 'auto';
                 canvas.style.cursor = 'grab';
@@ -301,20 +308,17 @@
             }
         }
 
-        // 3. Slider Ukuran Kuas
         document.getElementById('brushSizeSlider').addEventListener('input', (e) => {
             userBrushSize = parseInt(e.target.value);
             document.getElementById('brushSizeVal').textContent = userBrushSize + "px";
         });
 
-        // 4. Zoom Tampilan (CSS)
         document.getElementById('viewZoomSlider').addEventListener('input', (e) => {
             const val = e.target.value;
             document.getElementById('viewZoomVal').textContent = val + "%";
             canvas.style.width = val + "%"; 
         });
 
-        // 5. Zoom Foto (Canvas)
         document.getElementById('photoZoomSlider').addEventListener('input', (e) => {
             if(!isImageReady) return;
             const newScale = parseFloat(e.target.value);
@@ -328,7 +332,6 @@
             renderAll();
         });
 
-        // 6. Render
         function renderAll() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (isImageReady) {
@@ -337,7 +340,7 @@
             ctx.drawImage(frameImg, 0, 0);
         }
 
-        // --- TOUCH EVENTS ---
+        // --- TOUCH ---
 
         function getTouchPos(e) {
             const rect = canvas.getBoundingClientRect(); 
@@ -357,12 +360,10 @@
             if (currentMode === 'scroll') return;
             e.preventDefault(); 
             if (!isImageReady) return;
-            
             isTouching = true;
             const pos = getTouchPos(e);
             startX = pos.rawX;
             startY = pos.rawY;
-
             if (currentMode === 'brush' || currentMode === 'eraser') applyTool(pos.x, pos.y);
         }, { passive: false });
 
@@ -370,9 +371,7 @@
             if (currentMode === 'scroll') return;
             e.preventDefault(); 
             if (!isTouching || !isImageReady) return;
-
             const pos = getTouchPos(e);
-
             if (currentMode === 'move') {
                 const rect = canvas.getBoundingClientRect();
                 const cssScale = canvas.width / rect.width;
@@ -391,55 +390,58 @@
 
         canvas.addEventListener('touchend', () => { isTouching = false; });
 
-        // --- LOGIKA KUAS & PENGHAPUS ---
         function applyTool(x, y) {
-            // Konversi koordinat layar ke koordinat asli gambar
             const relX = (x - imgX) / imgScale;
             const relY = (y - imgY) / imgScale;
-            
-            // Hitung ukuran kuas relatif terhadap gambar (agar konsisten saat di-zoom)
-            // Rumus: ukuran_user / skala_foto
             const brushSize = userBrushSize / imgScale; 
             const halfBrush = brushSize / 2;
 
             if (currentMode === 'brush') {
-                // --- LOGIKA SENSOR (PIXELATE) ---
                 const pixelSize = 10; 
                 for (let bx = relX - halfBrush; bx < relX + halfBrush; bx += pixelSize) {
                     for (let by = relY - halfBrush; by < relY + halfBrush; by += pixelSize) {
                         if (bx < 0 || by < 0 || bx >= helperCanvas.width || by >= helperCanvas.height) continue;
-                        
-                        // Ambil warna pixel
                         const p = helperCtx.getImageData(bx, by, 1, 1).data;
-                        // Timpa dengan kotak solid (efek mozaik)
                         helperCtx.fillStyle = `rgb(${p[0]}, ${p[1]}, ${p[2]})`;
                         helperCtx.fillRect(bx, by, pixelSize, pixelSize);
                     }
                 }
             } 
             else if (currentMode === 'eraser') {
-                // --- LOGIKA PENGHAPUS (RESTORE) ---
-                // Kita "menjiplak" kembali dari rawImgObject (gambar bersih) ke helperCanvas
                 if(rawImgObject) {
-                    // drawImage punya fitur clipping (crop)
-                    // Syntax: image, sourceX, sourceY, sourceW, sourceH, destX, destY, destW, destH
                     helperCtx.drawImage(
                         rawImgObject, 
-                        relX - halfBrush, relY - halfBrush, brushSize, brushSize, // Ambil kotak dari gambar asli
-                        relX - halfBrush, relY - halfBrush, brushSize, brushSize  // Tempel ke kanvas edit
+                        relX - halfBrush, relY - halfBrush, brushSize, brushSize, 
+                        relX - halfBrush, relY - halfBrush, brushSize, brushSize  
                     );
                 }
             }
-
             renderAll();
         }
 
+        // --- FUNGSI SAVE DENGAN NOTIFIKASI ---
         function saveImage() {
+            // 1. Proses Download
             const link = document.createElement('a');
-            link.download = 'Testi-Zenith.png';
+            link.download = 'Testi-Zenith-' + Date.now() + '.png';
             link.href = canvas.toDataURL();
             link.click();
+
+            // 2. Munculkan Notifikasi Toast
+            showToast();
+        }
+
+        // Fungsi menampilkan notifikasi
+        function showToast() {
+            var x = document.getElementById("toast");
+            x.className = "show"; // Tambah class 'show' biar muncul
+            
+            // Hilangkan lagi setelah 3 detik (3000 ms)
+            setTimeout(function(){ 
+                x.className = x.className.replace("show", ""); 
+            }, 3000);
         }
     </script>
 </body>
-</html>
+    </html>
+    
